@@ -66,18 +66,27 @@ def volatilize(node_list,V):
       node.connection[j][1]=math.floor(node.connection[j][1]*0.9)
 
 def update_pheromone(ant,node_list):
-  # 目的ノードに到着したantによるフェロモンの付加(片側)
+  # 目的ノードに到着したantによるフェロモンの付加(両側)
   for i in range(1,len(ant.route)):
-    # ant.routeのi-1番目からi番目のedgeのフェロモン値を変更
     # ant.routeのi-1番目とi番目のノードを取得
     before_node = node_list[ant.route[i-1]]
     after_node = node_list[ant.route[i]]
+
+    # ant.routeのi-1番目からi番目のedgeのフェロモン値を変更
     # bofore_nodeのconnectionの0列目を取得
-    line0 = before_node.connection[:,0]
+    before_line0 = before_node.connection[:,0]
     # before_nodeのconnectionからafter_node番号の行を探索
-    row = np.where(line0 == ant.route[i])[0][0]
+    row = np.where(before_line0 == ant.route[i])[0][0]
     # i-1番ノードからi番ノードのフェロモン値を最小帯域を元に変更
     before_node.connection[row][1] += (F * ant.minwidth)
+
+    # ant.routeのi番目からi-1番目のedgeのフェロモン値を変更
+    # after_nodeのconnectionの0列目を取得
+    after_line0 = after_node.connection[:,0]
+    # after_nodeのconnectionからbefore_node番号の行を探索
+    row = np.where(after_line0 == ant.route[i-1])[0][0]
+    # i番ノードからi-1番ノードのフェロモン値を最小帯域を元に変更
+    after_node.connection[row][1] += (F * ant.minwidth)
 
 def ant_next_node(ant_list,node_list):
   # antの次のノードを決定
@@ -168,7 +177,7 @@ if __name__ == "__main__":
   node_list.append(Node(np.array([[11,M,random.randint(1,100)],[14,M,random.randint(1,100)]])))
 
 
-  for _ in range(10):
+  for _ in range(20):
     ant_list.append(Ant(0,15,[0],W))
 
   for _ in range(20):
