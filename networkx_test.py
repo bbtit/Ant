@@ -5,10 +5,10 @@ import matplotlib.pyplot as plt
 G = nx.Graph()
  
 # nodeデータの追加
-G.add_nodes_from(["A", "B", "C", "D", "E", "F"])
+G.add_nodes_from([1, 2, 3, 4, 5, 6])
  
 # edgeデータの追加
-G.add_edges_from([("A", "B"), ("B", "C"), ("B", "F"),("C", "D"), ("C", "E"), ("C", "F"), ("B", "F")])
+G.add_edges_from([(1, 2), (2, 3), (2, 6),(3, 4), (3, 5), (3, 6), (2, 6)])
  
 # ネットワークの可視化
 nx.draw(G, with_labels = True)
