@@ -101,6 +101,9 @@ def dicide_next_node(ant_list,node_list):
       ant_list.remove(ant)
       print(ant.route)
 
+def show_node_info(node_list):
+  for i in range(len(node_list)):
+    print(node_list[i].connection)
 
 #---------------------------------------------------
 
@@ -128,12 +131,11 @@ if __name__ == "__main__":
   for _ in range(10):
     ant_list.append(Ant(0,15,[0],W))
 
-  for _ in range(18):
+  for _ in range(20):
     dicide_next_node(ant_list, node_list)
 
-  for i in range(len(ant_list)):
-    # print(ant_list[i].current)
-    # print(ant_list[0].destination)
-    print(ant_list[i].route)
-    # print(ant_list[0].minwidth)
-    # print()
+show_node_info(node_list)
+volatilize(node_list,V)
+print("volatilize")
+show_node_info(node_list)
+
