@@ -1,3 +1,4 @@
+# 一度辿ったノードは選択しないように変更
 import math
 import random
 import numpy as np
@@ -6,7 +7,7 @@ N=10 # 総ノード数(実際は最初に用意する２つのノードで+2)
 V=0.8 # フェロモン揮発量
 M=10 # フェロモン最小値
 F=1 # フェロモン値決定用定数
-TTL=20 # 蟻のTime to Live
+TTL=10 # 蟻のTime to Live
 W=1000 # 帯域幅初期値
 node_list=[] # Nodeオブジェクト格納リスト
 ant_list=[] # Antオブジェクト格納リスト
@@ -60,13 +61,17 @@ def create_ba(node_list,N):
 
 def volatilize(node_list,V):
   # node_listの全nodeのフェロモンをV倍する関数 フェロモンの揮発に相当
-  # 最小フェロモン量を下回らないように(未実装)
   for node in node_list:
     for j in range(len(node.connection)):
-      node.connection[j][1]=math.floor(node.connection[j][1]*0.9)
+      new_pheronone=math.floor(node.connection[j][1]*0.9)
+      # 最小フェロモン量を下回らないように
+      if new_pheronone <= M:
+        node.connection[j][1]=M
+      else:
+        node.connection[j][1]=new_pheronone
 
 def update_pheromone(ant,node_list):
-  # 目的ノードに到着したantによるフェロモンの付加(両側)
+  # 目的ノードに到着したantによるフェロモンの付加(片側)
   for i in range(1,len(ant.route)):
     # ant.routeのi-1番目とi番目のノードを取得
     before_node = node_list[ant.route[i-1]]
@@ -80,75 +85,100 @@ def update_pheromone(ant,node_list):
     # i-1番ノードからi番ノードのフェロモン値を最小帯域を元に変更
     before_node.connection[row][1] += (F * ant.minwidth)
 
-    # ant.routeのi番目からi-1番目のedgeのフェロモン値を変更
-    # after_nodeのconnectionの0列目を取得
-    after_line0 = after_node.connection[:,0]
-    # after_nodeのconnectionからbefore_node番号の行を探索
-    row = np.where(after_line0 == ant.route[i-1])[0][0]
-    # i番ノードからi-1番ノードのフェロモン値を最小帯域を元に変更
-    after_node.connection[row][1] += (F * ant.minwidth)
 
 def ant_next_node(ant_list,node_list):
   # antの次のノードを決定
   # 繰り返し中にリストから削除を行うためreversed
   for ant in reversed(ant_list):
+    candidacy_pheromones=[]
     # antが今いるノードの接続ノードとフェロモン値を取得
     line0 = node_list[ant.current].connection[:,0]
     line1 = node_list[ant.current].connection[:,1]
-    # 次のノード番号をl1の重みづけでl0からランダムに選択
-    next_node=random.choices(line0,k=1,weights=line1)[0]
-    # 次のノード番号がconnect1列目の何行目か探索
-    row = np.where(line0 == next_node)[0][0]
+    # 接続ノードの内、antが辿っていないノード番号を取得
+    and_set=set(ant.route) & set(line0)
+    diff_list=list(set(line0) ^ and_set)
 
-    # antの属性更新
-    # もし現在ノードから次ノードの帯域幅が今までの最小帯域より小さかったら更新
-    if node_list[ant.current].connection[row][2] < ant.minwidth:
-      ant.minwidth = node_list[ant.current].connection[row][2]
-    ant.current = node_list[ant.current].connection[row][0]
-    ant.route.append(next_node)
-
-  # 蟻が目的ノードならばノードにフェロモンの付加後ant_listから削除
-    if ant.current==ant.destination:
-      update_pheromone(ant,node_list)
+    # 候補先がないなら削除
+    if diff_list==[]:
       ant_list.remove(ant)
       print(ant.route)
-      print(ant.minwidth)
 
-  # 蟻がTTLならばant_listから削除
-    if (len(ant.route)==TTL):
-      ant_list.remove(ant)
-      print(ant.route)
+    else:
+      # 蟻が辿っていないノード番号のフェロモンを取得
+      for i in diff_list:
+        # diff_listの要素がline0の何行目か取得
+        diff_row = np.where(line0 == i)[0][0]
+        # diff_listの要素のフェロモン値をcandidacy_pheromonsにappend
+        candidacy_pheromones.append(line1[diff_row])
+
+      # 次のノード番号をl1の重みづけでl0からランダムに選択
+      next_node=random.choices(diff_list,k=1,weights=candidacy_pheromones)[0]
+      # 次のノード番号がconnect1列目の何行目か探索
+      row = np.where(line0 == next_node)[0][0]
+
+      # antの属性更新
+      # もし現在ノードから次ノードの帯域幅が今までの最小帯域より小さかったら更新
+      if node_list[ant.current].connection[row][2] < ant.minwidth:
+        ant.minwidth = node_list[ant.current].connection[row][2]
+      ant.current = node_list[ant.current].connection[row][0]
+      ant.route.append(next_node)
+
+    # 蟻が目的ノードならばノードにフェロモンの付加後ant_listから削除
+      if ant.current==ant.destination:
+        update_pheromone(ant,node_list)
+        ant_list.remove(ant)
+        print(ant.route)
+        print(ant.minwidth)
+
+    # 蟻がTTLならばant_listから削除
+      if (len(ant.route)==TTL):
+        ant_list.remove(ant)
+        print(ant.route)
 
 def interest_next_node(interest_list,node_list):
   # interestの次のノードを決定
   # 繰り返し中にリストから削除を行うためreversed
   for interest in reversed(interest_list):
+    candidacy_pheromones=[]
     # interestが今いるノードの接続ノードとフェロモン値を取得
     line0 = node_list[interest.current].connection[:,0]
     line1 = node_list[interest.current].connection[:,1]
-    # 次のノード番号をl1の重みづけでl0からランダムに選択
-    next_node=random.choices(line0,k=1,weights=line1)[0]
-    # 次のノード番号がconnect1列目の何行目か探索
-    row = np.where(line0 == next_node)[0][0]
+    # 接続ノードの内、interestが辿っていないノード番号を取得
+    and_set=set(interest.route) & set(line0)
+    diff_list=list(set(line0) ^ and_set)
 
-    # interestの属性更新
-    # もし現在ノードから次ノードの帯域幅が今までの最小帯域より小さかったら更新
-    if node_list[interest.current].connection[row][2] < interest.minwidth:
-      interest.minwidth = node_list[interest.current].connection[row][2]
-    interest.current = node_list[interest.current].connection[row][0]
-    interest.route.append(next_node)
-
-  # interestが目的ノードならばinterest_listから削除
-    if interest.current==interest.destination:
+    # 候補先がないなら削除
+    if diff_list==[]:
       interest_list.remove(interest)
       print(interest.route)
-      print(interest.minwidth)
 
-  # interestがTTLならばinterest_listから削除
-    if (len(interest.route)==TTL):
-      interest_list.remove(interest)
-      print(interest.route)
-      print(interest.minwidth)
+    else:
+      # interestが辿っていないノード番号のフェロモンを取得
+      for i in diff_list:
+        # diff_listの要素がline0の何行目か取得
+        diff_row = np.where(line0 == i)[0][0]
+        # diff_listの要素のフェロモン値をcandidacy_pheromonsにappend
+        candidacy_pheromones.append(line1[diff_row])
+
+      # 次のノード番号をl1の重みづけでl0からランダムに選択
+      next_node=random.choices(diff_list,k=1,weights=candidacy_pheromones)[0]
+      # 次のノード番号がconnect1列目の何行目か探索
+      row = np.where(line0 == next_node)[0][0]
+
+      # interestの属性更新
+      # もし現在ノードから次ノードの帯域幅が今までの最小帯域より小さかったら更新
+      if node_list[interest.current].connection[row][2] < interest.minwidth:
+        interest.minwidth = node_list[interest.current].connection[row][2]
+      interest.current = node_list[interest.current].connection[row][0]
+      interest.route.append(next_node)
+
+    # interestが目的ノードならばノードにフェロモンの付加後interest_listから削除
+      if interest.current==interest.destination:
+        interest_list.remove(interest)
+
+    # interestがTTLならばinterest_listから削除
+      if (len(interest.route)==TTL):
+        interest_list.remove(interest)
 
 def show_node_info(node_list):
   for i in range(len(node_list)):
