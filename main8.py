@@ -1,5 +1,5 @@
-# グラフの可視化を実装
-# 最適経路が限られているため初期のランダムな移動のせいでよくない解になっている？
+# 複数回のシミュレーション
+# フェロモン付加式を変更
 import math
 import random
 
@@ -10,17 +10,14 @@ from cairosvg import svg2png
 
 N=10 # 総ノード数(実際は最初に用意する２つのノードで+2)
 V=0.9 # フェロモン揮発量
-M=10 # フェロモン最小値
-F=1 # フェロモン値決定用定数
+M=100 # フェロモン最小値
+F=0.1 # フェロモン値決定用定数
 TTL=8 # 蟻のTime to Live
 W=1000 # 帯域幅初期値
-ANT_NUM = 10 # 一回で放つAntの数  
+ANT_NUM = 10 # 一回で放つAntの数
 INTEREST_NUM = 50 # 一回で放つInterestの数
 
-node_list=[] # Nodeオブジェクト格納リスト
-ant_list=[] # Antオブジェクト格納リスト
-interest_list=[] # Interestオブジェクト格納リスト
-interest_log=[] # interestのログ用リスト
+
 
 
 class Node():
@@ -43,29 +40,6 @@ class Interest():
     self.minwidth = minwidth # 辿ってきた経路の最小帯域
 
 #---------------------------------------------------
-
-def create_ba(node_list,N):
-  # baモデルを作成する関数
-  # 事前準備　２つのノードからなる完全グラフを用意
-  node_list.append(Node(np.array[[1,M,10]]))
-  node_list.append(Node(np.array[[0,M,10]]))
-
-  for _ in range(N):
-    candidacy_list=[] # 接続先ノードの候補リスト
-
-    for i in range(len(node_list)):
-      # 次数(接続ノードの数)の分だけ接続先ノード候補リストにノード番号を追加
-      tmp_list=[i]*len(node_list[i].connection)
-      candidacy_list.extend(tmp_list)
-
-    # 接続先ノードをランダムに選択
-    select_node = random.choice(candidacy_list)
-    # 帯域幅をランダムに決定
-    width=random.randint(1,10)
-    # 接続先ノードのconnection属性に新規ノード追加
-    node_list[select_node].connection == np.append(node_list[select_node].connection, [len(node_list),M,width], axis=0)
-    # 新規ノードをnode_listに追加
-    node_list.append(Node(np.array[[select_node,M,width]]))
 
 def volatilize(node_list,V):
   # node_listの全nodeのフェロモンをV倍する関数 フェロモンの揮発に相当
@@ -91,7 +65,7 @@ def update_pheromone(ant,node_list):
     # before_nodeのconnectionからafter_node番号の行を探索
     row = np.where(before_line0 == ant.route[i])[0][0]
     # i-1番ノードからi番ノードのフェロモン値を最小帯域を元に変更
-    before_node.connection[row][1] += (F * ant.minwidth)
+    before_node.connection[row][1] += ( ant.minwidth )
 
 def ant_next_node(ant_list,node_list):
   # antの次のノードを決定
@@ -108,7 +82,7 @@ def ant_next_node(ant_list,node_list):
     # 候補先がないなら削除
     if diff_list==[]:
       ant_list.remove(ant)
-      print("Can't Find Route " + str(ant.route))
+      # print("Can't Find Route " + str(ant.route))
 
     else:
       # 蟻が辿っていないノード番号のフェロモンを取得
@@ -134,14 +108,14 @@ def ant_next_node(ant_list,node_list):
       if ant.current==ant.destination:
         update_pheromone(ant,node_list)
         ant_list.remove(ant)
-        print("Goal!")
-        print(ant.route)
-        print(ant.minwidth)
+        # print("Goal!")
+        # print(ant.route)
+        # print(ant.minwidth)
 
     # 蟻がTTLならばant_listから削除
       if (len(ant.route)==TTL):
         ant_list.remove(ant)
-        print(ant.route)
+        # print(ant.route)
 
 def interest_next_node(interest_list,node_list,interest_log,loop):
   # interestの次のノードを決定
@@ -272,60 +246,74 @@ def visualize_interest(interest_log):
 
 if __name__ == "__main__":
 
-  #4×4のネットワークを生成
-  node_list.append(Node(np.array([[1,M,100],[4,M,10]])))
-  node_list.append(Node(np.array([[0,M,10],[5,M,100],[2,M,10]])))
-  node_list.append(Node(np.array([[1,M,10],[6,M,10],[3,M,10]])))
-  node_list.append(Node(np.array([[2,M,10],[7,M,10]])))
-  node_list.append(Node(np.array([[0,M,10],[5,M,10],[8,M,10]])))
-  node_list.append(Node(np.array([[1,M,10],[4,M,10],[6,M,100],[9,M,10]])))
-  node_list.append(Node(np.array([[2,M,10],[5,M,10],[7,M,10],[10,M,100]])))
-  node_list.append(Node(np.array([[3,M,10],[6,M,10],[11,M,10]])))
-  node_list.append(Node(np.array([[4,M,10],[9,M,10],[12,M,10]])))
-  node_list.append(Node(np.array([[5,M,10],[8,M,10],[10,M,10],[13,M,10]])))
-  node_list.append(Node(np.array([[6,M,10],[9,M,10],[11,M,100],[14,M,10]])))
-  node_list.append(Node(np.array([[7,M,10],[10,M,10],[15,M,100]])))
-  node_list.append(Node(np.array([[8,M,10],[13,M,10]])))
-  node_list.append(Node(np.array([[9,M,10],[12,M,10],[14,M,10]])))
-  node_list.append(Node(np.array([[10,M,10],[13,M,10],[15,M,10]])))
-  node_list.append(Node(np.array([[11,M,10],[14,M,10]])))
+  multi_simulation_log = []
 
-  for loop in range(100):
+  for _ in range(100):
 
-    # Antによるフェロモン付加フェーズ
-    # Antを配置(ant_listにAntインスタンスを追加)
-    for _ in range(ANT_NUM):
-      ant_list.append(Ant(0,15,[0],W))
+    node_list=[] # Nodeオブジェクト格納リスト
+    ant_list=[] # Antオブジェクト格納リスト
+    interest_list=[] # Interestオブジェクト格納リスト
+    interest_log=[] # interestのログ用リスト
 
-    # Antの移動
-    for _ in range(TTL):
-      print("length of ant_list = "+str(len(ant_list)))
-      ant_next_node(ant_list, node_list)
+    #4×4のネットワークを生成
+    node_list.append(Node(np.array([[1,M,100],[4,M,10]])))
+    node_list.append(Node(np.array([[0,M,10],[5,M,100],[2,M,10]])))
+    node_list.append(Node(np.array([[1,M,10],[6,M,10],[3,M,10]])))
+    node_list.append(Node(np.array([[2,M,10],[7,M,10]])))
+    node_list.append(Node(np.array([[0,M,10],[5,M,10],[8,M,10]])))
+    node_list.append(Node(np.array([[1,M,10],[4,M,10],[6,M,100],[9,M,10]])))
+    node_list.append(Node(np.array([[2,M,10],[5,M,10],[7,M,10],[10,M,100]])))
+    node_list.append(Node(np.array([[3,M,10],[6,M,10],[11,M,10]])))
+    node_list.append(Node(np.array([[4,M,10],[9,M,10],[12,M,10]])))
+    node_list.append(Node(np.array([[5,M,10],[8,M,10],[10,M,10],[13,M,10]])))
+    node_list.append(Node(np.array([[6,M,10],[9,M,10],[11,M,100],[14,M,10]])))
+    node_list.append(Node(np.array([[7,M,10],[10,M,10],[15,M,100]])))
+    node_list.append(Node(np.array([[8,M,10],[13,M,10]])))
+    node_list.append(Node(np.array([[9,M,10],[12,M,10],[14,M,10]])))
+    node_list.append(Node(np.array([[10,M,10],[13,M,10],[15,M,10]])))
+    node_list.append(Node(np.array([[11,M,10],[14,M,10]])))
 
-    volatilize(node_list, V)
-    
-    # Interestによる評価フェーズ
-    # Interestを配置(interest_listにInterestインスタンスを追加)
-    for _ in range(INTEREST_NUM):
-      interest_list.append(Interest(0,15,[0],W))
+    for loop in range(100):
 
-    # Interestの移動    
-    interest_log.append([])
-    for _ in range(TTL):
-      interest_next_node(interest_list, node_list, interest_log, loop)
+      # Antによるフェロモン付加フェーズ
+      # Antを配置(ant_listにAntインスタンスを追加)
+      for _ in range(ANT_NUM):
+        ant_list.append(Ant(0,15,[0],W))
 
-print()
-print("----------------------End Loop------------------------------")
-print()
+      # Antの移動
+      for _ in range(TTL):
+        # print("length of ant_list = "+str(len(ant_list)))
+        ant_next_node(ant_list, node_list)
 
-# summary_interest_log=[]
-# for i in range(len(interest_log)):
-#   tmp_list=[i,len(interest_log[i]),round(sum(interest_log[i])/len(interest_log[i]),1)]
-#   summary_interest_log.append(tmp_list)
-# print(summary_interest_log)
+      volatilize(node_list, V)
+      
+      # Interestによる評価フェーズ
+      # Interestを配置(interest_listにInterestインスタンスを追加)
+      for _ in range(INTEREST_NUM):
+        interest_list.append(Interest(0,15,[0],W))
 
-show_node_info(node_list)
+      # Interestの移動
+      interest_log.append([])
+      for _ in range(TTL):
+        interest_next_node(interest_list, node_list, interest_log, loop)
 
-visualize_graph(node_list)
+    # print()
+    # print("----------------------End Loop------------------------------")
+    # print()
 
-visualize_interest(interest_log)
+    # summary_interest_log=[]
+    # for i in range(len(interest_log)):
+    #   tmp_list=[i,len(interest_log[i]),round(sum(interest_log[i])/len(interest_log[i]),1)]
+    #   summary_interest_log.append(tmp_list)
+    # print(summary_interest_log)
+
+    # print(interest_log[-1])
+    # print(len(interest_log))
+
+    multi_simulation_log.append(round(sum(interest_log[-1])/len(interest_log[-1]),1))
+
+  fig = plt.figure()
+  ax = fig.add_subplot(1,1,1)
+  ax.hist(multi_simulation_log)
+  plt.show()
+

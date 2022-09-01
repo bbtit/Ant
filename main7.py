@@ -1,5 +1,5 @@
-# グラフの可視化を実装
-# 最適経路が限られているため初期のランダムな移動のせいでよくない解になっている？
+# 一回のシミュレーション
+# フェロモン付加式を変更
 import math
 import random
 
@@ -11,10 +11,10 @@ from cairosvg import svg2png
 N=10 # 総ノード数(実際は最初に用意する２つのノードで+2)
 V=0.9 # フェロモン揮発量
 M=10 # フェロモン最小値
-F=1 # フェロモン値決定用定数
+F=0.1 # フェロモン値決定用定数
 TTL=8 # 蟻のTime to Live
 W=1000 # 帯域幅初期値
-ANT_NUM = 10 # 一回で放つAntの数  
+ANT_NUM = 10 # 一回で放つAntの数
 INTEREST_NUM = 50 # 一回で放つInterestの数
 
 node_list=[] # Nodeオブジェクト格納リスト
@@ -91,7 +91,7 @@ def update_pheromone(ant,node_list):
     # before_nodeのconnectionからafter_node番号の行を探索
     row = np.where(before_line0 == ant.route[i])[0][0]
     # i-1番ノードからi番ノードのフェロモン値を最小帯域を元に変更
-    before_node.connection[row][1] += (F * ant.minwidth)
+    before_node.connection[row][1] += ( 0.11 * ant.minwidth * ant.minwidth - ant.minwidth)
 
 def ant_next_node(ant_list,node_list):
   # antの次のノードを決定

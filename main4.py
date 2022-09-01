@@ -240,6 +240,8 @@ if __name__ == "__main__":
       print("length of ant_list = "+str(len(ant_list)))
       ant_next_node(ant_list, node_list)
 
+    volatilize(node_list, V)
+
     for _ in range(50):
       interest_list.append(Interest(0,15,[0],W))
     
