@@ -1,5 +1,5 @@
 # 一回のシミュレーション
-# フェロモン付加式を変更
+# 5×5のネットワークモデル
 import math
 import random
 
@@ -10,11 +10,12 @@ from cairosvg import svg2png
 
 V=0.9 # フェロモン揮発量
 M=10 # フェロモン最小値
-F=0.1 # フェロモン値決定用定数
-TTL=8 # 蟻のTime to Live
+TTL=10 # 蟻のTime to Live
 W=1000 # 帯域幅初期値
-ANT_NUM = 10 # 一回で放つAntの数
+ANT_NUM = 25 # 一回で放つAntの数
 INTEREST_NUM = 50 # 一回で放つInterestの数
+START_NODE = 0 # 出発ノード
+GOAL_NODE = 24 # 目的ノード
 GENERATION = 100 # 蟻，interestを放つ回数(世代)
 
 node_list=[] # Nodeオブジェクト格納リスト
@@ -44,28 +45,6 @@ class Interest():
 
 #---------------------------------------------------
 
-def create_ba(node_list,N):
-  # baモデルを作成する関数
-  # 事前準備　２つのノードからなる完全グラフを用意
-  node_list.append(Node(np.array[[1,M,10]]))
-  node_list.append(Node(np.array[[0,M,10]]))
-
-  for _ in range(N):
-    candidacy_list=[] # 接続先ノードの候補リスト
-
-    for i in range(len(node_list)):
-      # 次数(接続ノードの数)の分だけ接続先ノード候補リストにノード番号を追加
-      tmp_list=[i]*len(node_list[i].connection)
-      candidacy_list.extend(tmp_list)
-
-    # 接続先ノードをランダムに選択
-    select_node = random.choice(candidacy_list)
-    # 帯域幅をランダムに決定
-    width=random.randint(1,10)
-    # 接続先ノードのconnection属性に新規ノード追加
-    node_list[select_node].connection == np.append(node_list[select_node].connection, [len(node_list),M,width], axis=0)
-    # 新規ノードをnode_listに追加
-    node_list.append(Node(np.array[[select_node,M,width]]))
 
 def volatilize(node_list,V):
   # node_listの全nodeのフェロモンをV倍する関数 フェロモンの揮発に相当
@@ -74,9 +53,9 @@ def volatilize(node_list,V):
       new_pheronone=math.floor(node.connection[j][1]*0.9)
       # 最小フェロモン量を下回らないように
       if new_pheronone <= M:
-        node.connection[j][1]=M
+        node.connection[j][1] = M
       else:
-        node.connection[j][1]=new_pheronone
+        node.connection[j][1] = new_pheronone
 
 def update_pheromone(ant,node_list):
   # 目的ノードに到着したantによるフェロモンの付加(片側)
@@ -90,7 +69,7 @@ def update_pheromone(ant,node_list):
     before_line0 = before_node.connection[:,0]
     # before_nodeのconnectionからafter_node番号の行を探索
     row = np.where(before_line0 == ant.route[i])[0][0]
-    # i-1番ノードからi番ノードのフェロモン値を最小帯域を元に変更
+    # i-1番ノードからi番ノードのフェロモン値に最小帯域を元にフェロモンを加算
     before_node.connection[row][1] += ( 0.11 * ant.minwidth * ant.minwidth - ant.minwidth)
 
 def ant_next_node(ant_list,node_list):
@@ -98,17 +77,18 @@ def ant_next_node(ant_list,node_list):
   # 繰り返し中にリストから削除を行うためreversed
   for ant in reversed(ant_list):
     candidacy_pheromones=[]
+    current_node = node_list[ant.current]
     # antが今いるノードの接続ノードとフェロモン値を取得
-    line0 = node_list[ant.current].connection[:,0]
-    line1 = node_list[ant.current].connection[:,1]
+    line0 = current_node.connection[:,0]
+    line1 = current_node.connection[:,1]
     # 接続ノードの内、antが辿っていないノード番号を取得
     and_set=set(ant.route) & set(line0)
     diff_list=list(set(line0) ^ and_set)
 
     # 候補先がないなら削除
-    if diff_list==[]:
+    if diff_list == []:
       ant_list.remove(ant)
-      print("Can't Find Route " + str(ant.route))
+      print("Can't Find Route! → " + str(ant.route))
 
     else:
       # 蟻が辿っていないノード番号のフェロモンを取得
@@ -125,43 +105,43 @@ def ant_next_node(ant_list,node_list):
 
       # antの属性更新
       # もし現在ノードから次ノードの帯域幅が今までの最小帯域より小さかったら更新
-      if node_list[ant.current].connection[row][2] < ant.minwidth:
-        ant.minwidth = node_list[ant.current].connection[row][2]
-      ant.current = node_list[ant.current].connection[row][0]
+      if current_node.connection[row][2] < ant.minwidth:
+        ant.minwidth = current_node.connection[row][2]
+      # 蟻の現在地更新
+      ant.current = current_node.connection[row][0]
+      # 蟻の経路にノード番号追加
       ant.route.append(next_node)
 
     # 蟻が目的ノードならばノードにフェロモンの付加後ant_listから削除
       if ant.current==ant.destination:
         update_pheromone(ant,node_list)
         ant_list.remove(ant)
-        print("Goal!")
-        print(ant.route)
-        print(ant.minwidth)
+        print("Goal! → " + str(ant.route) + " : " + str(ant.minwidth))
 
     # 蟻がTTLならばant_listから削除
-      if (len(ant.route)==TTL):
+      elif (len(ant.route)==TTL):
         ant_list.remove(ant)
-        print(ant.route)
+        print("TTL! →" + str(ant.route))
 
 def interest_next_node(interest_list,node_list,interest_log,gen):
   # interestの次のノードを決定
   # 繰り返し中にリストから削除を行うためreversed
   for interest in reversed(interest_list):
     candidacy_pheromones=[]
+    current_node = node_list[interest.current]
     # interestが今いるノードの接続ノードとフェロモン値を取得
-    line0 = node_list[interest.current].connection[:,0]
-    line1 = node_list[interest.current].connection[:,1]
+    line0 = current_node.connection[:,0]
+    line1 = current_node.connection[:,1]
     # 接続ノードの内、interestが辿っていないノード番号を取得
     and_set=set(interest.route) & set(line0)
     diff_list=list(set(line0) ^ and_set)
-
     # 候補先がないなら削除
     if diff_list==[]:
       interest_list.remove(interest)
       
 
     else:
-      # interestが辿っていないノード番号のフェロモンを取得
+      # interestが辿っていないノード番号(diff_list)のフェロモンを取得
       for i in diff_list:
         # diff_listの要素がline0の何行目か取得
         diff_row = np.where(line0 == i)[0][0]
@@ -175,9 +155,9 @@ def interest_next_node(interest_list,node_list,interest_log,gen):
 
       # interestの属性更新
       # もし現在ノードから次ノードの帯域幅が今までの最小帯域より小さかったら更新
-      if node_list[interest.current].connection[row][2] < interest.minwidth:
-        interest.minwidth = node_list[interest.current].connection[row][2]
-      interest.current = node_list[interest.current].connection[row][0]
+      if current_node.connection[row][2] < interest.minwidth:
+        interest.minwidth = current_node.connection[row][2]
+      interest.current = current_node.connection[row][0]
       interest.route.append(next_node)
 
     # interestが目的ノードならばinterest_listから削除
@@ -186,7 +166,7 @@ def interest_next_node(interest_list,node_list,interest_log,gen):
         interest_log[gen].append(interest.minwidth)
 
     # interestがTTLならばinterest_listから削除
-      if (len(interest.route)==TTL):
+      elif (len(interest.route)==TTL):
         interest_list.remove(interest)
 
 def show_node_info(node_list):
@@ -248,8 +228,12 @@ def visualize_interest(interest_log):
 
   for i in range(len(interest_log)):
     x.append(i*ANT_NUM)
-    reach_rate.append((len(interest_log[i])/INTEREST_NUM)*100)
-    ave_wid.append(round(sum(interest_log[i])/len(interest_log[i]),1))
+    if (len(interest_log[i]) == 0):
+      reach_rate.append(0)
+      ave_wid.append(0)
+    else:
+      reach_rate.append((len(interest_log[i])/INTEREST_NUM)*100)
+      ave_wid.append(round(sum(interest_log[i])/len(interest_log[i]),1))
 
   fig = plt.figure()
 
@@ -272,34 +256,51 @@ def visualize_interest(interest_log):
 
 if __name__ == "__main__":
 
-  #4×4のネットワークを生成
-  node_list.append(Node(np.array([[1,M,100],[4,M,10]])))
-  node_list.append(Node(np.array([[0,M,10],[5,M,100],[2,M,10]])))
-  node_list.append(Node(np.array([[1,M,10],[6,M,10],[3,M,10]])))
-  node_list.append(Node(np.array([[2,M,10],[7,M,10]])))
-  node_list.append(Node(np.array([[0,M,10],[5,M,10],[8,M,10]])))
-  node_list.append(Node(np.array([[1,M,10],[4,M,10],[6,M,100],[9,M,10]])))
-  node_list.append(Node(np.array([[2,M,10],[5,M,10],[7,M,10],[10,M,100]])))
-  node_list.append(Node(np.array([[3,M,10],[6,M,10],[11,M,10]])))
-  node_list.append(Node(np.array([[4,M,10],[9,M,10],[12,M,10]])))
-  node_list.append(Node(np.array([[5,M,10],[8,M,10],[10,M,10],[13,M,10]])))
-  node_list.append(Node(np.array([[6,M,10],[9,M,10],[11,M,100],[14,M,10]])))
-  node_list.append(Node(np.array([[7,M,10],[10,M,10],[15,M,100]])))
-  node_list.append(Node(np.array([[8,M,10],[13,M,10]])))
-  node_list.append(Node(np.array([[9,M,10],[12,M,10],[14,M,10]])))
-  node_list.append(Node(np.array([[10,M,10],[13,M,10],[15,M,10]])))
-  node_list.append(Node(np.array([[11,M,10],[14,M,10]])))
+  # 5×5のネットワークを生成
+  # 1行目
+  node_list.append(Node(np.array([[1,M,100],[5,M,10]])))
+  node_list.append(Node(np.array([[0,M,10],[2,M,10],[6,M,100]])))
+  node_list.append(Node(np.array([[1,M,10],[3,M,10],[7,M,10]])))
+  node_list.append(Node(np.array([[2,M,10],[4,M,10],[8,M,10]])))
+  node_list.append(Node(np.array([[3,M,10],[9,M,10]])))
+  # 2行目
+  node_list.append(Node(np.array([[0,M,10],[6,M,10],[10,M,10]])))
+  node_list.append(Node(np.array([[1,M,10],[5,M,10],[7,M,100],[11,M,10]])))
+  node_list.append(Node(np.array([[2,M,10],[6,M,10],[8,M,10],[12,M,100]])))
+  node_list.append(Node(np.array([[3,M,10],[7,M,10],[9,M,10],[13,M,10]])))
+  node_list.append(Node(np.array([[4,M,10],[8,M,10],[14,M,10]])))
+  # 3行目
+  node_list.append(Node(np.array([[5,M,10],[11,M,10],[15,M,10]])))
+  node_list.append(Node(np.array([[6,M,10],[10,M,10],[12,M,10],[16,M,10]])))
+  node_list.append(Node(np.array([[7,M,10],[11,M,10],[13,M,100],[17,M,10]])))
+  node_list.append(Node(np.array([[8,M,10],[12,M,10],[14,M,10],[18,M,100]])))
+  node_list.append(Node(np.array([[9,M,10],[13,M,10],[19,M,10]])))
+  # 4行目
+  node_list.append(Node(np.array([[10,M,10],[16,M,10],[20,M,10]])))
+  node_list.append(Node(np.array([[11,M,10],[15,M,10],[17,M,10],[21,M,10]])))
+  node_list.append(Node(np.array([[12,M,10],[16,M,10],[18,M,10],[22,M,10]])))
+  node_list.append(Node(np.array([[13,M,10],[17,M,10],[19,M,100],[23,M,10]])))
+  node_list.append(Node(np.array([[14,M,10],[18,M,10],[24,M,100]])))
+  # 5行目
+  node_list.append(Node(np.array([[15,M,10],[21,M,10]])))
+  node_list.append(Node(np.array([[16,M,10],[20,M,10],[22,M,10]])))
+  node_list.append(Node(np.array([[17,M,10],[21,M,10],[23,M,10]])))
+  node_list.append(Node(np.array([[18,M,10],[22,M,10],[24,M,10]])))
+  node_list.append(Node(np.array([[19,M,10],[23,M,10]])))
+
+
 
   for gen in range(100):
+
+    print("gen" + str(gen))
 
     # Antによるフェロモン付加フェーズ
     # Antを配置(ant_listにAntインスタンスを追加)
     for _ in range(ANT_NUM):
-      ant_list.append(Ant(0,15,[0],W))
+      ant_list.append(Ant(START_NODE,GOAL_NODE,[0],W))
 
     # Antの移動
     for _ in range(TTL):
-      print("length of ant_list = "+str(len(ant_list)))
       ant_next_node(ant_list, node_list)
 
     volatilize(node_list, V)
@@ -307,7 +308,7 @@ if __name__ == "__main__":
     # Interestによる評価フェーズ
     # Interestを配置(interest_listにInterestインスタンスを追加)
     for _ in range(INTEREST_NUM):
-      interest_list.append(Interest(0,15,[0],W))
+      interest_list.append(Interest(START_NODE,GOAL_NODE,[0],W))
 
     # Interestの移動    
     interest_log.append([])
@@ -315,7 +316,7 @@ if __name__ == "__main__":
       interest_next_node(interest_list, node_list, interest_log, gen)
 
 print()
-print("----------------------End gen------------------------------")
+print("----------------------End Gen------------------------------")
 print()
 
 # summary_interest_log=[]
