@@ -104,9 +104,9 @@ def ant_next_node(ant_list,node_list):
         candidacy_pheromones.append(line1[diff_row])
         # diff_listの要素の帯域幅をcandidacy_widthにappend
         candidacy_width.append(line2[diff_row])
-        weight_width = [i ** BETA for i in candidacy_width]
+      weight_width = [i ** BETA for i in candidacy_width]
 
-        weighting = [x*y for (x, y) in zip(candidacy_pheromones,weight_width)]
+      weighting = [x*y for (x, y) in zip(candidacy_pheromones,weight_width)]
 
       # 次のノード番号をl1の重みづけでl0からランダムに選択
       next_node = random.choices(diff_list,k=1,weights=weighting)[0]
