@@ -10,6 +10,12 @@ class Node():
     self.pheromone = pheromone # 接続先ノードとのフェロモンの配列
     self.width = width # 接続先ノードとの帯域の配列
 
+def show_node_info(node_list:list[Node]) -> None:
+  for i in range(len(node_list)):
+    print("Node"+str(i))
+    print(str(node_list[i].connection))
+    print(str(node_list[i].pheromone))
+    print(str(node_list[i].width))
 
 def create_equal_edge_graph2(node_list:list[Node], edge_num:int) -> None:
   for i in range(len(node_list)):
@@ -44,7 +50,7 @@ def create_equal_edge_graph2(node_list:list[Node], edge_num:int) -> None:
 
 def create_equal_edge_graph(node_num:int, edge_num:int) -> list[Node]:
   # 正則グラフを作成し，Nodeオブジェクトが含まれたlistを返す
-  node_list = [Node([],[],[]) for _ in range(node_num)]
+  node_list = [Node([],[],[]) for _ in range(node_num)]  
   # node_listの先頭から一本ずつ辺を引く
   for _ in range(edge_num):
     for i in range(len(node_list)):
@@ -69,27 +75,20 @@ def create_equal_edge_graph(node_num:int, edge_num:int) -> list[Node]:
           # 新たな接続先情報を追加
           node_list[i].connection.append(next_node_idx)
           node_list[i].pheromone.append(M)
-          node_list[i].width.append(W)
+          node_list[i].width.append(random.randint(1,10) * 10)
           
           node_list[next_node_idx].connection.append(i)
           node_list[next_node_idx].pheromone.append(M)
-          node_list[next_node_idx].width.append(W)
+          node_list[next_node_idx].width.append(random.randint(1,10) * 10)
 
-  for i in range(len(node_list)):
-    print(str(i)+"->"+str(node_list[i].connection))
-    if (len(node_list[i].connection) != edge_num ):
-      print("Bad Graph!")
-      create_equal_edge_graph(node_num, edge_num)
-  
   return node_list
 
-def show_node_info(node_list:list[Node]) -> None:
-  for i in range(len(node_list)):
-    print("Node"+str(i))
-    print(str(node_list[i].connection))
-    print(str(node_list[i].pheromone))
-    print(str(node_list[0].width))
 
-node_list = create_equal_edge_graph(100,5)
-
-show_node_info(node_list)
+while(1):
+  node_list = create_equal_edge_graph(100,5)
+  show_node_info(node_list)
+  if(all(len(node.connection) == 5 for node in node_list)):
+    print("Good Graph")
+    break
+  else:
+    print("Bad Graph")

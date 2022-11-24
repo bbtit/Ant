@@ -1,4 +1,5 @@
 # randの追加
+# ランダムなネットワークの作成
 import math
 import random
 import csv
@@ -16,8 +17,11 @@ BETA = 0 # 経路選択の際のヒューリスティック値に対する重み
 
 ANT_NUM = 10 # 一回で放つAntの数
 START_NODE = 0 # 出発ノード
-GOAL_NODE = 99 # 目的ノード
-GENERATION = 100 # ant，interestを放つ回数(世代)
+GOAL_NODE = 19 # 目的ノード
+GENERATION = 10 # ant，interestを放つ回数(世代)
+
+NODE_NUM = 20
+EDGE_NUM = 3
 
 
 class Node():
@@ -69,7 +73,11 @@ def update_pheromone(ant:Ant, node_list:list[Node]) -> None:
     index = before_node.connection.index(ant.route[i])
     # print("find!") # debug
     # i-1番ノードからi番ノードのフェロモン値に (その辺の帯域 × 辿った経路の帯域の平均) を加算
-    before_node.pheromone[index] += before_node.width[index] * ( sum(ant.width) / len(ant.width) )
+    # before_node.pheromone[index] += before_node.width[index] * int(( sum(ant.width) / len(ant.width) ))
+    before_node.pheromone[index] += min(ant.width)
+  # print("Ant Route → " + str(ant.route))
+  # print("Ant Width → " + str(ant.width))
+  # print("Ant Evaluation → " + str(int(sum(ant.width) / len(ant.width))))
 
 def ant_next_node(ant_list:list[Ant], node_list:list[Node]) -> None:
   # antの次のノードを決定
@@ -93,7 +101,7 @@ def ant_next_node(ant_list:list[Ant], node_list:list[Node]) -> None:
     # 候補先がないなら削除
     if diff_list == []:
       ant_list.remove(ant)
-      print("Can't Find Route! → " + str(ant.route))
+      print("Ant Can't Find Route! → " + str(ant.route))
 
     # 候補先がある場合
     else:
@@ -119,16 +127,17 @@ def ant_next_node(ant_list:list[Ant], node_list:list[Node]) -> None:
       # antの経路の帯域の配列に帯域を追加
       ant.width.append(width[connection.index(next_node)])
 
-    # antが目的ノードならばノードにフェロモンの付加後ant_listから削除
+      # antが目的ノードならばノードにフェロモンの付加後ant_listから削除
       if ant.current == ant.destination:
         update_pheromone(ant,node_list)
         ant_list.remove(ant)
-        print("Goal! → " + str(ant.route) + " : " + str(ant.width))
+        print("Ant Goal! → " + str(ant.route) + " : " + str(min(ant.width)))
 
-    # antがTTLならばant_listから削除
+
+      # antがTTLならばant_listから削除
       elif (len(ant.route) == TTL):
         ant_list.remove(ant)
-        print("TTL! →" + str(ant.route))
+        print("Ant TTL! → " + str(ant.route))
 
 def interest_next_node(interest_list:list[Interest], node_list:list[Node], interest_log:list[int]) -> None:
   # interestの次のノードを決定
@@ -213,24 +222,24 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
       if rand.current == rand.destination:
         rand_log.append(rand.minwidth)
         rand_list.remove(rand)
-        print("rand Goal! → " + str(rand.route) + " : " + str(rand.minwidth))
+        print("Rand Goal! → " + str(rand.route) + " : " + str(rand.minwidth))
 
     # randがTTLならばrand_listから削除
       elif (len(rand.route) == TTL):
         rand_list.remove(rand)
         rand_log.append(0)
-        print("rand TTL! →" + str(rand.route))
+        print("Rand TTL! →" + str(rand.route))
 
 def show_node_info(node_list:list[Node]) -> None:
   for i in range(len(node_list)):
     print("Node"+str(i))
     print(str(node_list[i].connection))
     print(str(node_list[i].pheromone))
-    print(str(node_list[0].width))
+    print(str(node_list[i].width))
 
 def create_equal_edge_graph(node_num:int, edge_num:int) -> list[Node]:
   # 正則グラフを作成し，Nodeオブジェクトが含まれたlistを返す
-  node_list = [Node([],[],[]) for _ in range(node_num)]
+  node_list = [Node([],[],[]) for _ in range(node_num)]  
   # node_listの先頭から一本ずつ辺を引く
   for _ in range(edge_num):
     for i in range(len(node_list)):
@@ -255,24 +264,20 @@ def create_equal_edge_graph(node_num:int, edge_num:int) -> list[Node]:
           # 新たな接続先情報を追加
           node_list[i].connection.append(next_node_idx)
           node_list[i].pheromone.append(M)
-          node_list[i].width.append(10)
+          node_list[i].width.append(random.randint(1,10) * 10)
           
           node_list[next_node_idx].connection.append(i)
           node_list[next_node_idx].pheromone.append(M)
-          node_list[next_node_idx].width.append(10)
+          node_list[next_node_idx].width.append(random.randint(1,10) * 10)
 
-  for i in range(len(node_list)):
-    print(str(i)+"->"+str(node_list[i].connection))
-    if (len(node_list[i].connection) != edge_num ):
-      print("Bad Graph!")
-      create_equal_edge_graph(node_num, edge_num)
-  
   return node_list
 
 
 #---------------------------------------------------
 
 if __name__ == "__main__":
+
+  random.seed(5)
 
   # シミュレーション回数を指定
   for _ in range(1):
@@ -287,17 +292,22 @@ if __name__ == "__main__":
     rand_list:     list[Rand] = [] # Randオブジェクト格納リスト
     rand_log:      list[int] = [] # Randのログ用リスト
 
-    node_list = create_equal_edge_graph(100,5)
+    # グラフの作成
+    while(1):
+      node_list = create_equal_edge_graph(NODE_NUM,EDGE_NUM)
+      # 辺の数が条件を満たしていたら抜ける
+      if(all(len(node.connection) == EDGE_NUM for node in node_list)):
+        break
 
     # show_node_info(node_list) # debug
 
     for gen in range(GENERATION):
 
-      print("gen" + str(gen))
+      print("Gen" + str(gen))
 
       # Antによるフェロモン付加フェーズ
       # Antを配置
-      ant_list.extend( [ Ant(START_NODE,GOAL_NODE,[START_NODE],[]) ] * ANT_NUM)
+      ant_list.extend( [ Ant(START_NODE,GOAL_NODE,[START_NODE],[]) for _ in range(ANT_NUM) ]  )
       # Antの移動
       for _ in range(TTL):
         ant_next_node(ant_list, node_list)
@@ -323,6 +333,8 @@ if __name__ == "__main__":
     print("----------------------End Gen------------------------------")
     print()
 
+    show_node_info(node_list)
+
     print(interest_log)
     f = open("./log_interest.csv", "a", newline = "")
     writer = csv.writer(f)
@@ -334,6 +346,4 @@ if __name__ == "__main__":
     writer = csv.writer(f)
     writer.writerow(rand_log)
     f.close()
-    
-
     
