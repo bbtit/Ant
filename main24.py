@@ -1,5 +1,7 @@
 # randの追加
 # ランダムなネットワークの作成
+# 最大値の導入
+# 現状ベスト
 import math
 import random
 import csv
@@ -9,16 +11,17 @@ import networkx as nx
 import numpy as np
 from cairosvg import svg2png
 
-V = 0.9 # フェロモン揮発量
+V = 0.99 # フェロモン揮発量
 MIN_F = 100 # フェロモン最小値
+MAX_F = 1000000 # フェロモン最大値
 TTL = 100 # antのTime to Live
 W = 1000 # 帯域幅初期値
-BETA = 0 # 経路選択の際のヒューリスティック値に対する重み(累乗)
+BETA = 1 # 経路選択の際のヒューリスティック値に対する重み(累乗)
 
-ANT_NUM = 10 # 一回で放つAntの数
+ANT_NUM = 1 # 一回で放つAntの数
 START_NODE = 0 # 出発ノード
-GOAL_NODE = 99 # 目的ノード
-GENERATION = 10 # ant，interestを放つ回数(世代)
+GOAL_NODE = 3 # 目的ノード
+GENERATION = 100 # ant，interestを放つ回数(世代)
 
 NODE_NUM = 100
 EDGE_NUM = 4
@@ -74,7 +77,10 @@ def update_pheromone(ant:Ant, node_list:list[Node]) -> None:
     # print("find!") # debug
     # i-1番ノードからi番ノードのフェロモン値に (その辺の帯域 × 辿った経路の帯域の平均) を加算
     # before_node.pheromone[index] += before_node.width[index] * int(( sum(ant.width) / len(ant.width) ))
-    before_node.pheromone[index] +=  before_node.width[index] * min(ant.width)
+    # before_node.pheromone[index] += int(( sum(ant.width) / len(ant.width) ))
+    before_node.pheromone[index] += min(ant.width)
+    if before_node.pheromone[index] > MAX_F:
+      before_node.pheromone[index] = MAX_F
   # print("Ant Route → " + str(ant.route))
   # print("Ant Width → " + str(ant.width))
   # print("Ant Evaluation → " + str(int(sum(ant.width) / len(ant.width))))
@@ -205,6 +211,8 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
     if diff_list == []:
       rand_list.remove(rand)
       rand_log.append(0)
+      if max(rand_log) != 0:
+        rand_log[-1] = max(rand_log)
       print("Rand Can't Find Route! → " + str(rand.route))
       
     # 候補先がある場合
@@ -221,6 +229,8 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
     # randが目的ノードならばrand_listから削除
       if rand.current == rand.destination:
         rand_log.append(rand.minwidth)
+        if max(rand_log) != rand.minwidth:
+          rand_log[-1] = max(rand_log)
         rand_list.remove(rand)
         print("Rand Goal! → " + str(rand.route) + " : " + str(rand.minwidth))
 
@@ -228,6 +238,8 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
       elif (len(rand.route) == TTL):
         rand_list.remove(rand)
         rand_log.append(0)
+        if max(rand_log) != 0:
+          rand_log[-1] = max(rand_log)
         print("Rand TTL! →" + str(rand.route))
 
 def show_node_info(node_list:list[Node]) -> None:
@@ -283,7 +295,10 @@ def create_graph(node_num:int, edge_num:int, hop:int, width:int) -> list[Node]:
   # 正則グラフを作成し，Nodeオブジェクトが含まれたlistを返す
   node_list = [Node([],[],[]) for _ in range(node_num)]  
   # START_NODEからGOAL_NODEまで太い帯域で繋ぐ
-  start2goal=random.sample(range(node_num),hop)
+  cand_node = [i for i in range(node_num)]
+  cand_node.remove(START_NODE)
+  cand_node.remove(GOAL_NODE)
+  start2goal=random.sample(cand_node,hop)
   start2goal.insert(0,START_NODE)
   start2goal.append(GOAL_NODE)
   print("start2goal → " + str(start2goal))
@@ -323,14 +338,14 @@ def create_graph(node_num:int, edge_num:int, hop:int, width:int) -> list[Node]:
 
   return node_list
 
-#---------------------------------------------------
+#-------------------------------------------------------------------------
 
 if __name__ == "__main__":
 
   # random.seed(5)
 
   # シミュレーション回数を指定
-  for _ in range(1):
+  for _ in range(100):
 
     node_list:     list[Node] = [] # Nodeオブジェクト格納リスト
 
@@ -342,22 +357,11 @@ if __name__ == "__main__":
     rand_list:     list[Rand] = [] # Randオブジェクト格納リスト
     rand_log:      list[int] = [] # Randのログ用リスト
 
-    # # グラフの作成
-    # while(1):
-    #   node_list = create_equal_edge_graph(NODE_NUM,EDGE_NUM)
-    #   # 辺の数が条件を満たしていたら抜ける
-    #   if(all(len(node.connection) == EDGE_NUM for node in node_list)):
-    #     break
-
-
-    while(1):
-      node_list = create_graph(NODE_NUM,EDGE_NUM,5,100)
-      # 辺の数が条件を満たしていたら抜ける
-      if(all(len(node.connection) == EDGE_NUM for node in node_list)):
-        break
-
-    # show_node_info(node_list) # debug
-
+    
+    node_list = [Node([1,2],[MIN_F,MIN_F],[100,1000]),
+                  Node([0,3],[MIN_F,MIN_F],[10,100]),
+                  Node([0,3],[MIN_F,MIN_F],[10,10]),
+                  Node([1,2],[MIN_F,MIN_F],[10,10])]
 
     for gen in range(GENERATION):
 

@@ -1,5 +1,6 @@
 # randの追加
 # ランダムなネットワークの作成
+# 最大値の導入
 import math
 import random
 import csv
@@ -9,16 +10,17 @@ import networkx as nx
 import numpy as np
 from cairosvg import svg2png
 
-V = 0.9 # フェロモン揮発量
+V = 0.99 # フェロモン揮発量
 MIN_F = 100 # フェロモン最小値
+MAX_F = 10000 # フェロモン最大値
 TTL = 100 # antのTime to Live
 W = 1000 # 帯域幅初期値
-BETA = 0 # 経路選択の際のヒューリスティック値に対する重み(累乗)
+BETA = 1 # 経路選択の際のヒューリスティック値に対する重み(累乗)
 
-ANT_NUM = 10 # 一回で放つAntの数
+ANT_NUM = 1 # 一回で放つAntの数
 START_NODE = 0 # 出発ノード
 GOAL_NODE = 99 # 目的ノード
-GENERATION = 10 # ant，interestを放つ回数(世代)
+GENERATION = 100 # ant，interestを放つ回数(世代)
 
 NODE_NUM = 100
 EDGE_NUM = 4
@@ -74,7 +76,9 @@ def update_pheromone(ant:Ant, node_list:list[Node]) -> None:
     # print("find!") # debug
     # i-1番ノードからi番ノードのフェロモン値に (その辺の帯域 × 辿った経路の帯域の平均) を加算
     # before_node.pheromone[index] += before_node.width[index] * int(( sum(ant.width) / len(ant.width) ))
-    before_node.pheromone[index] +=  before_node.width[index] * min(ant.width)
+    before_node.pheromone[index] += min(ant.width)
+    if before_node.pheromone[index] > MAX_F:
+      before_node.pheromone[index] = MAX_F
   # print("Ant Route → " + str(ant.route))
   # print("Ant Width → " + str(ant.width))
   # print("Ant Evaluation → " + str(int(sum(ant.width) / len(ant.width))))
@@ -205,6 +209,8 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
     if diff_list == []:
       rand_list.remove(rand)
       rand_log.append(0)
+      if max(rand_log) != 0:
+        rand_log[-1] = max(rand_log)
       print("Rand Can't Find Route! → " + str(rand.route))
       
     # 候補先がある場合
@@ -221,6 +227,8 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
     # randが目的ノードならばrand_listから削除
       if rand.current == rand.destination:
         rand_log.append(rand.minwidth)
+        if max(rand_log) != rand.minwidth:
+          rand_log[-1] = max(rand_log)
         rand_list.remove(rand)
         print("Rand Goal! → " + str(rand.route) + " : " + str(rand.minwidth))
 
@@ -228,6 +236,8 @@ def rand_next_node(rand_list:list[Rand], node_list:list[Node], rand_log:list[int
       elif (len(rand.route) == TTL):
         rand_list.remove(rand)
         rand_log.append(0)
+        if max(rand_log) != 0:
+          rand_log[-1] = max(rand_log)
         print("Rand TTL! →" + str(rand.route))
 
 def show_node_info(node_list:list[Node]) -> None:
@@ -236,41 +246,6 @@ def show_node_info(node_list:list[Node]) -> None:
     print(str(node_list[i].connection))
     print(str(node_list[i].pheromone))
     print(str(node_list[i].width))
-
-def create_equal_edge_graph(node_num:int, edge_num:int) -> list[Node]:
-  # 正則グラフを作成し，Nodeオブジェクトが含まれたlistを返す
-  node_list = [Node([],[],[]) for _ in range(node_num)]  
-  # node_listの先頭から一本ずつ辺を引く
-  for _ in range(edge_num):
-    for i in range(len(node_list)):
-      # print("Num "+str(i)) # debug
-      # 規定の辺の数より少ないなら実行
-      if (len(node_list[i].connection) < edge_num):
-        # 規定の辺の数より辺が少ないノードのインデックスを候補として格納
-        cand_index = [x for x ,y in enumerate(node_list) if len(y.connection) < edge_num]
-        # 自分のインデックスと接続先インデックスは候補から削除
-        if i in cand_index:
-          cand_index.remove(i)
-        for j in node_list[i].connection:
-          if j in cand_index:
-            cand_index.remove(j)   
-        # print("->"+str(cand_index)) # debug
-        # 候補がなければやめる
-        if cand_index == []:
-          continue
-        # 候補先があればランダムに選択
-        else:
-          next_node_idx = random.choice(cand_index)
-          # 新たな接続先情報を追加
-          node_list[i].connection.append(next_node_idx)
-          node_list[i].pheromone.append(MIN_F)
-          node_list[i].width.append(random.randint(1,10) * 10)
-          
-          node_list[next_node_idx].connection.append(i)
-          node_list[next_node_idx].pheromone.append(MIN_F)
-          node_list[next_node_idx].width.append(random.randint(1,10) * 10)
-
-  return node_list
 
 
 def connect2node(node_list:list[Node],index_a:int, index_b:int, width:int) -> None:
@@ -283,7 +258,10 @@ def create_graph(node_num:int, edge_num:int, hop:int, width:int) -> list[Node]:
   # 正則グラフを作成し，Nodeオブジェクトが含まれたlistを返す
   node_list = [Node([],[],[]) for _ in range(node_num)]  
   # START_NODEからGOAL_NODEまで太い帯域で繋ぐ
-  start2goal=random.sample(range(node_num),hop)
+  cand_node = [i for i in range(node_num)]
+  cand_node.remove(START_NODE)
+  cand_node.remove(GOAL_NODE)
+  start2goal=random.sample(cand_node,hop)
   start2goal.insert(0,START_NODE)
   start2goal.append(GOAL_NODE)
   print("start2goal → " + str(start2goal))
@@ -323,11 +301,42 @@ def create_graph(node_num:int, edge_num:int, hop:int, width:int) -> list[Node]:
 
   return node_list
 
+def node2edge(node_list):
+  # node_listからネットワークのグラフ表示のためのedgeのリストedgesを返す
+  edges=[]
+  for i in range(len(node_list)):
+    # i番目ノードの接続先を取得
+    line0 = node_list[i].connection
+    # i番目ノードのフェロモン値を取得
+    line1 = node_list[i].pheromone
+    # i番目ノードの帯域幅を取得
+    line2 = node_list[i].width
+
+    sum_line1 = sum(line1)
+
+    for j in range(len(line0)):
+      # 色はフェロモン量の絶対値ではなく、そのノードのフェロモン総和との相対値で決定
+      # 太さは帯域÷20
+      edge=(i,line0[j],{"minlen":"5.0", "label": str(line2[j])+":"+str(line1[j]), "color": "0.000 " + str(round(line1[j]/sum_line1,2)) + " 1.000", "penwidth":str(line2[j]/20), "fontsize":"8"})
+      edges.append(edge)
+
+  return edges
+
+def visualize_graph(node_list):
+  nodes = [i for i in range(len(node_list))]
+  edges = node2edge(node_list)
+
+  g = nx.MultiDiGraph()
+  g.add_nodes_from(nodes)
+  g.add_edges_from(edges)
+
+  agraph = nx.nx_agraph.to_agraph(g)
+  agraph.node_attr["shape"] = "circle" 
+  agraph.draw( "./sample.pdf", prog="fdp", format="pdf")
+
 #---------------------------------------------------
 
 if __name__ == "__main__":
-
-  # random.seed(5)
 
   # シミュレーション回数を指定
   for _ in range(1):
@@ -343,13 +352,6 @@ if __name__ == "__main__":
     rand_log:      list[int] = [] # Randのログ用リスト
 
     # # グラフの作成
-    # while(1):
-    #   node_list = create_equal_edge_graph(NODE_NUM,EDGE_NUM)
-    #   # 辺の数が条件を満たしていたら抜ける
-    #   if(all(len(node.connection) == EDGE_NUM for node in node_list)):
-    #     break
-
-
     while(1):
       node_list = create_graph(NODE_NUM,EDGE_NUM,5,100)
       # 辺の数が条件を満たしていたら抜ける
@@ -357,7 +359,6 @@ if __name__ == "__main__":
         break
 
     # show_node_info(node_list) # debug
-
 
     for gen in range(GENERATION):
 
@@ -405,3 +406,4 @@ if __name__ == "__main__":
     writer.writerow(rand_log)
     f.close()
     
+    # visualize_graph(node_list)
